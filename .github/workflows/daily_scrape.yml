@@ -37,7 +37,8 @@ jobs:
         run: |
           git config user.name "grbk-tracker-bot"
           git config user.email "grbk-tracker-bot@example.com"
-          git pull --rebase origin main
           git add data reports
-          git commit -m "Update GRBK tracker outputs" || echo "No changes to commit"
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update GRBK tracker outputs"
+          git pull --rebase origin main
           git push origin main
