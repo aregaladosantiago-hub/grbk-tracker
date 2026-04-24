@@ -1,52 +1,64 @@
 {
   "settings": {
-    "removal_watch_days": 7,
-    "high_confidence_removal_days": 14,
-    "request_delay_seconds": 1,
-    "use_playwright": true
+    "use_playwright": true,
+    "request_delay_seconds": 1
   },
   "brands": [
     {
-      "brand": "The Providence Group",
-      "market": "Atlanta",
-      "urls": ["https://theprovidencegroup.com/new-homes/available/"],
-      "parser": "generic"
-    },
-    {
       "brand": "Southgate Homes",
       "market": "DFW",
-      "urls": ["https://southgatehomes.com/find-your-home/available-homes/"],
-      "parser": "generic"
-    },
-    {
-      "brand": "CB JENI Homes",
-      "market": "DFW",
-      "urls": ["https://cbjenihomes.com/"],
-      "parser": "generic"
-    },
-    {
-      "brand": "Normandy Homes",
-      "market": "DFW",
-      "urls": ["https://normandyhomes.com/"],
-      "parser": "generic"
-    },
-    {
-      "brand": "Trophy Signature Homes",
-      "market": "Texas",
-      "urls": ["https://trophysignaturehomes.com/quick-move-in-homes/"],
-      "parser": "generic"
-    },
-    {
-      "brand": "Centre Living Homes",
-      "market": "Texas",
-      "urls": ["https://centrelivinghomes.com/"],
-      "parser": "generic"
-    },
-    {
-      "brand": "GHO Homes",
-      "market": "Florida Treasure Coast",
-      "urls": ["https://www.ghohomes.com/"],
-      "parser": "generic"
+      "parser": "southgate_community",
+      "urls": [
+        {
+          "url": "https://southgatehomes.com/communities/eliana/",
+          "community": "Eliana",
+          "city": "McKinney",
+          "state": "TX",
+          "market": "DFW"
+        },
+        {
+          "url": "https://southgatehomes.com/community-detail/painted-tree-50-series/",
+          "community": "Painted Tree 50' Series",
+          "city": "McKinney",
+          "state": "TX",
+          "market": "DFW"
+        },
+        {
+          "url": "https://southgatehomes.com/community-detail/painted-tree-60-series/",
+          "community": "Painted Tree 60' Series",
+          "city": "McKinney",
+          "state": "TX",
+          "market": "DFW"
+        },
+        {
+          "url": "https://southgatehomes.com/communities/prosper-ridge/",
+          "community": "Prosper Ridge",
+          "city": "Prosper",
+          "state": "TX",
+          "market": "DFW"
+        },
+        {
+          "url": "https://southgatehomes.com/communities/the-reserve-at-watters/",
+          "community": "The Reserve at Watters",
+          "city": "Allen",
+          "state": "TX",
+          "market": "DFW"
+        },
+        {
+          "url": "https://southgatehomes.com/communities/windsong-ranch-61-series/",
+          "community": "Windsong Ranch 61' Series",
+          "city": "Prosper",
+          "state": "TX",
+          "market": "DFW"
+        },
+        {
+          "url": "https://southgatehomes.com/communities/windsong-ranch-71-series/",
+          "community": "Windsong Ranch 71' Series",
+          "city": "Prosper",
+          "state": "TX",
+          "market": "DFW"
+        }
+      ]
     }
   ]
 }
