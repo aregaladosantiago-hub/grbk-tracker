@@ -59,6 +59,25 @@
           "market": "DFW"
         }
       ]
+    },
+    {
+      "brand": "Trophy Signature Homes",
+      "market": "Texas",
+      "parser": "trophy_market",
+      "urls": [
+        {
+          "url": "https://trophysignaturehomes.com/homes/dallas-ft-worth",
+          "market": "DFW"
+        },
+        {
+          "url": "https://trophysignaturehomes.com/homes/austin",
+          "market": "Austin"
+        },
+        {
+          "url": "https://trophysignaturehomes.com/homes/houston",
+          "market": "Houston"
+        }
+      ]
     }
   ]
 }
