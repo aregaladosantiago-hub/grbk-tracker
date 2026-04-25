@@ -7,9 +7,8 @@ Comparison baseline: **2026-04-24**
 
 | Segment | Active | New | Removed | Price-cut ratio | Price-cut listings |
 |---|---:|---:|---:|---:|---:|
-| Total tracked | 632 | 617 | 0 | 30.2% | 191 |
+| Total tracked | 15 | 0 | 0 | 53.3% | 8 |
 | Southgate Homes | 15 | 0 | 0 | 53.3% | 8 |
-| Trophy Signature Homes | 617 | N/A | N/A | 29.7% | 183 |
 
 ## How to read it
 
