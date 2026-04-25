@@ -35,17 +35,19 @@ def price_cut_mask(df: pd.DataFrame):
     price = pd.to_numeric(df.get("price"), errors="coerce")
     prior = pd.to_numeric(df.get("prior_price"), errors="coerce")
     incentive = df.get("incentive_text", "").fillna("").astype(str).str.lower()
-    return ((prior > price) & price.notna()) | incentive.str.contains("price cut|new lower price", regex=True)
+    return ((prior > price) & price.notna()) | incentive.str.contains("price cut|new lower price|savings shown", regex=True)
 
 
-def summarize(latest: pd.DataFrame, prior: pd.DataFrame):
-    latest = latest.copy()
-    prior = prior.copy()
+def add_keys(df: pd.DataFrame):
+    df = df.copy()
+    if not df.empty:
+        df["listing_key"] = clean_key(df)
+    return df
 
-    if not latest.empty:
-        latest["listing_key"] = clean_key(latest)
-    if not prior.empty:
-        prior["listing_key"] = clean_key(prior)
+
+def metric_row(label, latest, prior):
+    latest = add_keys(latest)
+    prior = add_keys(prior)
 
     latest_keys = set(latest["listing_key"]) if not latest.empty else set()
     prior_keys = set(prior["listing_key"]) if not prior.empty else set()
@@ -56,36 +58,17 @@ def summarize(latest: pd.DataFrame, prior: pd.DataFrame):
     active = len(latest_keys)
     new = len(new_keys) if prior_keys else None
     removed = len(removed_keys) if prior_keys else None
-
     cuts = int(price_cut_mask(latest).sum()) if active else 0
     cut_ratio = cuts / active if active else 0
 
-    return active, new, removed, cuts, cut_ratio, new_keys, removed_keys
-
-
-def write_csv_outputs(latest: pd.DataFrame, prior: pd.DataFrame, new_keys, removed_keys):
-    reports = Path("reports")
-    reports.mkdir(exist_ok=True)
-
-    latest.to_csv(reports / "latest_active.csv", index=False)
-
-    if latest.empty:
-        pd.DataFrame().to_csv(reports / "new_vs_prior_snapshot.csv", index=False)
-    else:
-        latest_with_key = latest.copy()
-        latest_with_key["listing_key"] = clean_key(latest_with_key)
-        latest_with_key[latest_with_key["listing_key"].isin(new_keys)].drop(columns=["listing_key"]).to_csv(
-            reports / "new_vs_prior_snapshot.csv", index=False
-        )
-
-    if prior.empty:
-        pd.DataFrame().to_csv(reports / "removed_vs_prior_snapshot.csv", index=False)
-    else:
-        prior_with_key = prior.copy()
-        prior_with_key["listing_key"] = clean_key(prior_with_key)
-        prior_with_key[prior_with_key["listing_key"].isin(removed_keys)].drop(columns=["listing_key"]).to_csv(
-            reports / "removed_vs_prior_snapshot.csv", index=False
-        )
+    return {
+        "Segment": label,
+        "Active": active,
+        "New": "N/A" if new is None else new,
+        "Removed": "N/A" if removed is None else removed,
+        "Price-cut ratio": f"{cut_ratio:.1%}",
+        "Price-cut listings": cuts,
+    }, new_keys, removed_keys
 
 
 def generate_report(snapshot_dir: str, out_path: str):
@@ -106,11 +89,35 @@ def generate_report(snapshot_dir: str, out_path: str):
         prior_date = dates[-2]
         prior = df[df["snapshot_date"] == prior_date].copy()
 
-    active, new, removed, cuts, cut_ratio, new_keys, removed_keys = summarize(latest, prior)
-    write_csv_outputs(latest, prior, new_keys, removed_keys)
+    total_row, total_new_keys, total_removed_keys = metric_row("Total tracked", latest, prior)
 
-    new_display = "N/A" if new is None else str(new)
-    removed_display = "N/A" if removed is None else str(removed)
+    brand_rows = []
+    for brand in sorted(latest["brand"].dropna().unique()):
+        brand_latest = latest[latest["brand"] == brand].copy()
+        brand_prior = prior[prior["brand"] == brand].copy() if not prior.empty and "brand" in prior.columns else pd.DataFrame()
+        row, _, _ = metric_row(brand, brand_latest, brand_prior)
+        brand_rows.append(row)
+
+    reports = Path("reports")
+    reports.mkdir(exist_ok=True)
+    latest.to_csv(reports / "latest_active.csv", index=False)
+
+    latest_with_key = add_keys(latest)
+    if total_new_keys:
+        latest_with_key[latest_with_key["listing_key"].isin(total_new_keys)].drop(columns=["listing_key"]).to_csv(
+            reports / "new_vs_prior_snapshot.csv", index=False
+        )
+    else:
+        pd.DataFrame(columns=latest.columns).to_csv(reports / "new_vs_prior_snapshot.csv", index=False)
+
+    prior_with_key = add_keys(prior)
+    if total_removed_keys:
+        prior_with_key[prior_with_key["listing_key"].isin(total_removed_keys)].drop(columns=["listing_key"]).to_csv(
+            reports / "removed_vs_prior_snapshot.csv", index=False
+        )
+    else:
+        pd.DataFrame(columns=latest.columns).to_csv(reports / "removed_vs_prior_snapshot.csv", index=False)
+
     baseline = "No prior snapshot yet" if prior_date is None else str(pd.Timestamp(prior_date).date())
 
     lines = []
@@ -121,14 +128,24 @@ def generate_report(snapshot_dir: str, out_path: str):
     lines.append("")
     lines.append("## Core metrics")
     lines.append("")
-    lines.append("| Metric | Value | What it means |")
-    lines.append("|---|---:|---|")
-    lines.append(f"| Active listings | {active} | Current supply visible on tracked brand sites |")
-    lines.append(f"| New listings | {new_display} | Homes visible now that were not visible in the prior snapshot |")
-    lines.append(f"| Removed listings | {removed_display} | Homes visible in the prior snapshot that are no longer visible; sell-through proxy, not confirmed sales |")
-    lines.append(f"| Price-cut ratio | {cut_ratio:.1%} | Active listings showing a lower current price vs prior price or explicit price-cut language |")
+    lines.append("| Segment | Active | New | Removed | Price-cut ratio | Price-cut listings |")
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    all_rows = [total_row] + brand_rows
+    for row in all_rows:
+        lines.append(
+            f"| {row['Segment']} | {row['Active']} | {row['New']} | {row['Removed']} | "
+            f"{row['Price-cut ratio']} | {row['Price-cut listings']} |"
+        )
+
     lines.append("")
     lines.append("## How to read it")
+    lines.append("")
+    lines.append("- **Active listings** = current supply visible on tracked brand sites.")
+    lines.append("- **New listings** = homes visible now that were not visible in the prior snapshot.")
+    lines.append("- **Removed listings** = homes visible in the prior snapshot that are no longer visible; sell-through proxy, not confirmed sales.")
+    lines.append("- **Price-cut ratio** = active listings showing a lower current price vs prior price or explicit savings/price-cut language.")
+    lines.append("")
+    lines.append("## Signal framework")
     lines.append("")
     lines.append("- **Active up + removals low** = inventory building / slower sell-through.")
     lines.append("- **Active down + removals high** = cleaner demand signal.")
@@ -138,7 +155,7 @@ def generate_report(snapshot_dir: str, out_path: str):
     lines.append("## Notes")
     lines.append("")
     lines.append("- This is a public-listing flow tracker, not official GRBK orders or closings.")
-    lines.append("- Removed listings are a sell-through proxy. A home can also disappear because of relisting, URL changes, or temporary website changes.")
+    lines.append("- Removed listings are a sell-through proxy. A home can disappear because of relisting, URL changes, or temporary website changes.")
     lines.append("- The first snapshot only establishes the baseline; the signal improves after several daily snapshots.")
 
     Path(out_path).write_text("\n".join(lines))
