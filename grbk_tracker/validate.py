@@ -9,6 +9,16 @@ REQUIRED_COLUMNS = {
 }
 
 
+def normalized_text(df: pd.DataFrame, column: str):
+    if column not in df.columns:
+        return pd.Series([""] * len(df), index=df.index)
+    return df[column].fillna("").astype(str).str.lower().str.strip()
+
+
+def listing_keys(df: pd.DataFrame):
+    return normalized_text(df, "brand") + "|" + normalized_text(df, "market") + "|" + normalized_text(df, "address")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate latest GRBK tracker snapshot quality.")
     parser.add_argument("--snapshot-dir", default="data/snapshots")
@@ -28,6 +38,21 @@ def main():
     if len(df) == 0:
         print("WARNING: snapshot has zero rows. This may mean the websites blocked scraping or the parser needs improvement.")
         return
+
+    qa_flags = df["qa_flag"].fillna("").astype(str)
+    trophy_mismatch = qa_flags.str.contains("trophy_count_mismatch", regex=False)
+    if trophy_mismatch.any():
+        examples = qa_flags[trophy_mismatch].value_counts().head(5).to_string()
+        raise SystemExit(f"Trophy count QA failed. Refusing to trust this snapshot.\n{examples}")
+
+    has_address = normalized_text(df, "address").ne("")
+    duplicate_keys = listing_keys(df[has_address])
+    duplicates = duplicate_keys[duplicate_keys.duplicated(keep=False)]
+    if not duplicates.empty:
+        raise SystemExit(
+            "Duplicate active listing identities found. This would corrupt active/new/removed metrics.\n"
+            + duplicates.value_counts().head(10).to_string()
+        )
 
     print("Rows by brand:")
     print(df.groupby("brand").size().sort_values(ascending=False).to_string())
