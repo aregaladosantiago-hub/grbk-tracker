@@ -29,6 +29,10 @@ jobs:
         run: |
           python -m grbk_tracker.scrape
 
+      - name: Validate snapshot
+        run: |
+          python -m grbk_tracker.validate
+
       - name: Generate report
         run: |
           python -m grbk_tracker.report
@@ -40,5 +44,6 @@ jobs:
           git add data reports
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "Update GRBK tracker outputs"
-          git pull --rebase origin main
-          git push origin main
+          BRANCH_NAME="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          git pull --rebase origin "$BRANCH_NAME"
+          git push origin "HEAD:$BRANCH_NAME"

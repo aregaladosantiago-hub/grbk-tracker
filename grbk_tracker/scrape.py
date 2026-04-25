@@ -20,6 +20,8 @@ SNAPSHOT_COLUMNS = [
 ]
 
 PRICE_RE = re.compile(r"\$[\d,]+")
+CURRENT_PRICE_LINE_RE = re.compile(r"^\$[\d,]+$")
+SHOWING_TOTAL_RE = re.compile(r"Showing\s+\d+\s+of\s+(\d+)\s+Quick\s+Move-?In\s+Homes", re.IGNORECASE)
 STATUS_RE = re.compile(
     r"\b(?:Ready\s+(?:Now|January|February|March|April|May|June|July|August|September|October|November|December)|Available Date:\s*Now|Est Completion Date:\s*[A-Za-z]+\s+\d{4}|Available Now|Quick Move-?In|Under Construction)\b",
     re.IGNORECASE,
@@ -28,9 +30,17 @@ LOT_RE = re.compile(r"((?:Block\s+[A-Z],?\s*)?Lot\s+\d+)", re.IGNORECASE)
 SQFT_RE = re.compile(r"([\d,]+)\s*SQ\s*FT", re.IGNORECASE)
 BEDS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*Beds?", re.IGNORECASE)
 BATHS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*Baths?", re.IGNORECASE)
+STREET_SUFFIX_PATTERN = (
+    r"Street|St\.?|Road|Rd\.?|Drive|Dr\.?|Lane|Ln\.?|Court|Ct\.?|Trail|Way|"
+    r"Circle|Cir\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Loop|Run|Bend|Parkway|Pkwy\.?"
+)
 STREET_RE = re.compile(
-    r"\b\d{3,6}\s+[A-Za-z0-9 .'-]+?\s+"
-    r"(?:Street|St\.?|Road|Rd\.?|Drive|Dr\.?|Lane|Ln\.?|Court|Ct\.?|Trail|Way|Circle|Cir\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Loop|Run|Bend|Parkway|Pkwy\.?)\b",
+    rf"\b\d{{3,6}}\s+[A-Za-z0-9 .'-]+?\s+(?:{STREET_SUFFIX_PATTERN})\b",
+    re.IGNORECASE,
+)
+FULL_ADDRESS_RE = re.compile(
+    rf"\b\d{{3,6}}\s+[A-Za-z0-9 .'-]+?\s+(?:{STREET_SUFFIX_PATTERN})\s+"
+    r"[A-Za-z .'-]+,?\s+(?:TX|Texas)\s+\d{5}\b",
     re.IGNORECASE,
 )
 
@@ -81,13 +91,14 @@ async def fetch_html(url: str, use_playwright: bool, click_load_more: bool = Fal
             if click_load_more:
                 # Trophy pages show "Showing 12 of X Quick Move-In Homes Load 12 More".
                 # Click until the button disappears or stops adding content.
-                last_text_len = 0
-                for _ in range(40):  # enough for ~480 homes at 12 per click
+                last_showing_text = ""
+                for _ in range(60):  # enough for more than 700 homes at 12 per click
                     text = await page.locator("body").inner_text()
-                    current_len = len(text)
-                    if current_len == last_text_len and "Load 12 More" not in text:
+                    showing = SHOWING_TOTAL_RE.search(text)
+                    current_showing_text = showing.group(0) if showing else ""
+                    if current_showing_text == last_showing_text and "Load 12 More" not in text:
                         break
-                    last_text_len = current_len
+                    last_showing_text = current_showing_text
 
                     try:
                         button = page.get_by_text("Load 12 More", exact=True)
@@ -124,6 +135,13 @@ def normalize_lines(html: str) -> List[str]:
     return lines
 
 
+def parse_price_value(value: str):
+    match = PRICE_RE.search(value or "")
+    if not match:
+        return None
+    return int(match.group(0).replace("$", "").replace(",", ""))
+
+
 def extract_prices(block_lines: List[str]):
     prices = []
     for line in block_lines:
@@ -156,16 +174,35 @@ def parse_float(regex, text):
     return float(m.group(1))
 
 
+def normalize_address(address: str):
+    address = re.sub(r"\bTexas\b", "TX", address or "", flags=re.IGNORECASE)
+    address = re.sub(r"\s+", " ", address)
+    address = re.sub(r"\s+,", ",", address)
+    return clean_text(address)
+
+
+def extract_full_address(text: str):
+    match = FULL_ADDRESS_RE.search(text or "")
+    if not match:
+        return None
+    return normalize_address(match.group(0))
+
+
+def address_key(address: str):
+    return clean_text(address).lower()
+
+
 def extract_address_from_lines(lines: List[str], i: int):
     window = " ".join(lines[i:i + 4])
+    full_address = extract_full_address(window)
+    if full_address:
+        return full_address
+
     street = STREET_RE.search(window)
     city = CITY_STATE_RE.search(window)
 
     if street and city:
-        address = f"{street.group(0)} {city.group(0)}"
-        address = re.sub(r"\bTexas\b", "TX", address, flags=re.IGNORECASE)
-        address = re.sub(r"\s+", " ", address).strip()
-        return address
+        return normalize_address(f"{street.group(0)} {city.group(0)}")
 
     full = re.search(
         r"(\d{3,6}\s+.+?\s+(?:Aledo|Alvarado|Aubrey|Austin|Celina|Crowley|Elgin|Farmersville|Forney|Fort Worth|Greenville|Gunter|Haslet|Huffman|Hutto|Lago Vista|Lavon|McKinney|Pilot Point|Ponder|Princeton|Prosper|Seagoville|Waxahachie|Allen)\s*,?\s*(?:TX|Texas)\s+\d{5})",
@@ -173,9 +210,7 @@ def extract_address_from_lines(lines: List[str], i: int):
         flags=re.IGNORECASE,
     )
     if full:
-        address = full.group(1)
-        address = re.sub(r"\bTexas\b", "TX", address, flags=re.IGNORECASE)
-        return clean_text(address)
+        return normalize_address(full.group(1))
 
     return None
 
@@ -199,6 +234,25 @@ def listing_urls_from_html(html: str, base_url: str) -> List[str]:
         if label in {"View Detail", "View Listing"}:
             urls.append(urljoin(base_url, a["href"]))
     return urls
+
+
+def trophy_address_url_map(html: str, base_url: str):
+    soup = BeautifulSoup(html, "lxml")
+    urls_by_address = {}
+    for a in soup.find_all("a", href=True):
+        address = extract_full_address(clean_text(a.get_text(" ", strip=True)))
+        if not address:
+            continue
+        urls_by_address[address_key(address)] = urljoin(base_url, a["href"])
+    return urls_by_address
+
+
+def extract_expected_trophy_total(lines: List[str]):
+    text = " ".join(lines)
+    match = SHOWING_TOTAL_RE.search(text)
+    if not match:
+        return None
+    return int(match.group(1).replace(",", ""))
 
 
 def extract_community(raw_text: str):
@@ -271,7 +325,7 @@ def parse_listing_block(block_lines, address, brand_cfg, url_meta, source_url, s
         "qa_flag": None,
     }
 
-    row["home_key"] = make_home_key(row["brand"], row["address"], row["community"], row["lot"], None)
+    row["home_key"] = make_home_key(row["brand"], row["address"], row["community"], row["lot"], row["url"])
 
     flags = []
     if not row["address"]:
@@ -287,6 +341,109 @@ def parse_listing_block(block_lines, address, brand_cfg, url_meta, source_url, s
 
 def is_valid_listing(row: Dict) -> bool:
     return bool(row.get("address") and row.get("price") is not None)
+
+
+def is_trophy_current_price_line(line: str):
+    if not CURRENT_PRICE_LINE_RE.match(line or ""):
+        return False
+    price = parse_price_value(line)
+    return price is not None and price >= 100000
+
+
+def trophy_price_indices(lines: List[str]):
+    return [i for i, line in enumerate(lines) if is_trophy_current_price_line(line)]
+
+
+def trophy_prices_from_block(block_lines: List[str]):
+    current = parse_price_value(block_lines[0]) if block_lines else None
+    if current is None:
+        return None, None
+
+    prior_candidates = []
+    for line in block_lines[1:]:
+        for raw_price in PRICE_RE.findall(line):
+            price = int(raw_price.replace("$", "").replace(",", ""))
+            # Ignore mortgage payments and incentive amounts like Save: $7,000.
+            if price >= 100000 and price > current:
+                prior_candidates.append(price)
+
+    prior = max(prior_candidates) if prior_candidates else None
+    return current, prior
+
+
+def parse_trophy_listing_block(block_lines, brand_cfg, url_meta, source_url, snapshot_date, address_urls):
+    raw_text = " | ".join(block_lines)
+    address = extract_full_address(raw_text)
+    price, prior_price = trophy_prices_from_block(block_lines)
+    listing_url = address_urls.get(address_key(address)) if address else None
+
+    community = extract_community(raw_text)
+    plan = extract_plan(raw_text)
+    status = extract_status(raw_text)
+
+    price_pressure = []
+    if prior_price is not None and price is not None and prior_price > price:
+        price_pressure.append("Price Cut")
+    if "new lower price" in raw_text.lower():
+        price_pressure.append("New Lower Price")
+    if "save:" in raw_text.lower():
+        price_pressure.append("Savings Shown")
+
+    row = {
+        "snapshot_date": snapshot_date,
+        "brand": brand_cfg["brand"],
+        "market": url_meta.get("market") or brand_cfg.get("market"),
+        "source_url": source_url,
+        "url": listing_url or source_url,
+        "home_key": None,
+        "community": community,
+        "address": address,
+        "lot": None,
+        "plan": plan,
+        "status": status,
+        "price": price,
+        "prior_price": prior_price,
+        "sqft": parse_int(SQFT_RE, raw_text),
+        "beds": parse_float(BEDS_RE, raw_text),
+        "baths": parse_float(BATHS_RE, raw_text),
+        "garage": None,
+        "incentive_text": " | ".join(dict.fromkeys(price_pressure)) if price_pressure else None,
+        "raw_text": raw_text[:2500],
+        "qa_flag": None,
+    }
+
+    row["home_key"] = make_home_key(row["brand"], row["address"], row["community"], None, row["url"])
+
+    flags = []
+    if not row["address"]:
+        flags.append("missing_address")
+    if row["price"] is None:
+        flags.append("missing_price")
+    if not row["community"]:
+        flags.append("missing_community")
+    if not listing_url:
+        flags.append("missing_detail_url")
+    row["qa_flag"] = ";".join(flags) if flags else None
+
+    return row
+
+
+def dedupe_rows(rows: List[Dict]):
+    deduped = {}
+    for row in rows:
+        key = (
+            row.get("brand"),
+            row.get("market"),
+            address_key(row.get("address") or ""),
+            row.get("url") or "",
+        )
+        deduped[key] = row
+    return list(deduped.values())
+
+
+def append_qa_flag(row: Dict, flag: str):
+    existing = row.get("qa_flag")
+    row["qa_flag"] = f"{existing};{flag}" if existing else flag
 
 
 def qmi_window_or_all(lines: List[str]) -> List[str]:
@@ -347,15 +504,55 @@ async def scrape_address_based_page(
         if is_valid_listing(row):
             rows.append(row)
 
-    deduped = {}
-    for row in rows:
-        deduped[(row["brand"], row["community"], row["address"])] = row
-
+    rows = dedupe_rows(rows)
     print(
         f"{brand_cfg['brand']} | {url_meta.get('market', url_meta.get('community', source_url))}: "
-        f"{len(address_points)} address candidates, {len(deduped)} valid listings"
+        f"{len(address_points)} address candidates, {len(rows)} valid listings"
     )
-    return list(deduped.values())
+    return rows
+
+
+async def scrape_trophy_market_page(
+    brand_cfg: Dict,
+    url_meta: Dict,
+    snapshot_date: str,
+    use_playwright: bool,
+):
+    source_url = url_meta["url"]
+    html = await fetch_html(source_url, use_playwright=use_playwright, click_load_more=True)
+    lines = normalize_lines(html)
+    expected_total = extract_expected_trophy_total(lines)
+    address_urls = trophy_address_url_map(html, source_url)
+
+    price_points = trophy_price_indices(lines)
+    rows = []
+    for n, idx in enumerate(price_points):
+        next_idx = price_points[n + 1] if n + 1 < len(price_points) else len(lines)
+        block = lines[idx:next_idx]
+        row = parse_trophy_listing_block(
+            block_lines=block,
+            brand_cfg=brand_cfg,
+            url_meta=url_meta,
+            source_url=source_url,
+            snapshot_date=snapshot_date,
+            address_urls=address_urls,
+        )
+        if is_valid_listing(row):
+            rows.append(row)
+
+    rows = dedupe_rows(rows)
+    if expected_total is not None and len(rows) != expected_total:
+        mismatch = f"trophy_count_mismatch_expected_{expected_total}_got_{len(rows)}"
+        for row in rows:
+            append_qa_flag(row, mismatch)
+        print(f"WARNING {brand_cfg['brand']} | {url_meta.get('market')}: {mismatch}")
+
+    print(
+        f"{brand_cfg['brand']} | {url_meta.get('market', source_url)}: "
+        f"{len(price_points)} price cards, {len(rows)} valid listings"
+        + (f", expected {expected_total}" if expected_total is not None else "")
+    )
+    return rows
 
 
 def normalize_url_entry(entry: Union[str, Dict]) -> Dict:
@@ -375,19 +572,15 @@ async def scrape_brand(brand_cfg: Dict, snapshot_date: str, use_playwright: bool
                 click_load_more=False, southgate_qmi_only=True
             ))
         elif parser == "trophy_market":
-            rows.extend(await scrape_address_based_page(
-                brand_cfg, url_meta, snapshot_date, use_playwright,
-                click_load_more=True, southgate_qmi_only=False
+            rows.extend(await scrape_trophy_market_page(
+                brand_cfg, url_meta, snapshot_date, use_playwright
             ))
         else:
             print(f"Skipping {brand_cfg['brand']} because parser={parser} is not implemented/tested yet.")
 
         time.sleep(delay)
 
-    deduped = {}
-    for row in rows:
-        deduped[(row["brand"], row["community"], row["address"])] = row
-    return list(deduped.values())
+    return dedupe_rows(rows)
 
 
 def write_snapshot(rows: List[Dict], snapshot_date: str, out_dir: str) -> Path:
@@ -423,13 +616,19 @@ async def main():
     delay = float(settings.get("request_delay_seconds", 1))
 
     all_rows = []
+    errors = []
     for brand_cfg in cfg["brands"]:
         try:
             rows = await scrape_brand(brand_cfg, args.date, use_playwright, delay)
             print(f"{brand_cfg['brand']}: {len(rows)} usable listing rows")
             all_rows.extend(rows)
         except Exception as exc:
-            print(f"ERROR scraping {brand_cfg.get('brand', 'UNKNOWN')}: {exc}")
+            error = f"ERROR scraping {brand_cfg.get('brand', 'UNKNOWN')}: {exc}"
+            print(error)
+            errors.append(error)
+
+    if errors:
+        raise SystemExit("\n".join(errors))
 
     out_path = write_snapshot(all_rows, args.date, args.out_dir)
     print(f"Saved {len(all_rows)} rows to {out_path}")

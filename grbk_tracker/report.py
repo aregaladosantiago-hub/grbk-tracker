@@ -21,21 +21,23 @@ def load_snapshots(snapshot_dir: str):
     return pd.concat(frames, ignore_index=True), paths
 
 
+def normalized_text(df: pd.DataFrame, column: str):
+    if column not in df.columns:
+        return pd.Series([""] * len(df), index=df.index)
+    return df[column].fillna("").astype(str).str.lower().str.strip()
+
+
 def clean_key(df: pd.DataFrame):
+    address = normalized_text(df, "address")
+    url = normalized_text(df, "url")
+    identity = address.where(address.ne(""), url)
     return (
-        df["brand"].fillna("").astype(str).str.lower().str.strip()
+        normalized_text(df, "brand")
         + "|"
-        + df["community"].fillna("").astype(str).str.lower().str.strip()
+        + normalized_text(df, "market")
         + "|"
-        + df["address"].fillna("").astype(str).str.lower().str.strip()
+        + identity
     )
-
-
-def price_cut_mask(df: pd.DataFrame):
-    price = pd.to_numeric(df.get("price"), errors="coerce")
-    prior = pd.to_numeric(df.get("prior_price"), errors="coerce")
-    incentive = df.get("incentive_text", "").fillna("").astype(str).str.lower()
-    return ((prior > price) & price.notna()) | incentive.str.contains("price cut|new lower price|savings shown", regex=True)
 
 
 def add_keys(df: pd.DataFrame):
@@ -43,6 +45,51 @@ def add_keys(df: pd.DataFrame):
     if not df.empty:
         df["listing_key"] = clean_key(df)
     return df
+
+
+def price_series(df: pd.DataFrame, column: str):
+    if column not in df.columns:
+        return pd.Series([pd.NA] * len(df), index=df.index)
+    return pd.to_numeric(df[column], errors="coerce")
+
+
+def explicit_price_cut_mask(df: pd.DataFrame):
+    price = price_series(df, "price")
+    prior = price_series(df, "prior_price")
+    incentive = normalized_text(df, "incentive_text")
+    return ((prior > price) & price.notna()) | incentive.str.contains(
+        "price cut|new lower price|savings shown",
+        regex=True,
+    )
+
+
+def price_cut_keys(latest: pd.DataFrame, prior: pd.DataFrame):
+    latest = add_keys(latest)
+    prior = add_keys(prior)
+    if latest.empty:
+        return set()
+
+    latest_unique = latest.drop_duplicates("listing_key", keep="last").copy()
+    cut_keys = set(latest_unique.loc[explicit_price_cut_mask(latest_unique), "listing_key"])
+
+    if prior.empty:
+        return cut_keys
+
+    prior_unique = prior.drop_duplicates("listing_key", keep="last").copy()
+    compare = latest_unique[["listing_key"]].copy()
+    compare["latest_price"] = price_series(latest_unique, "price")
+
+    prior_prices = prior_unique[["listing_key"]].copy()
+    prior_prices["prior_snapshot_price"] = price_series(prior_unique, "price")
+
+    merged = compare.merge(prior_prices, on="listing_key", how="inner")
+    historical_cut = merged[
+        merged["latest_price"].notna()
+        & merged["prior_snapshot_price"].notna()
+        & (merged["latest_price"] < merged["prior_snapshot_price"])
+    ]
+    cut_keys.update(historical_cut["listing_key"])
+    return cut_keys
 
 
 def metric_row(label, latest, prior):
@@ -58,7 +105,7 @@ def metric_row(label, latest, prior):
     active = len(latest_keys)
     new = len(new_keys) if prior_keys else None
     removed = len(removed_keys) if prior_keys else None
-    cuts = int(price_cut_mask(latest).sum()) if active else 0
+    cuts = len(price_cut_keys(latest, prior))
     cut_ratio = cuts / active if active else 0
 
     return {
@@ -143,7 +190,7 @@ def generate_report(snapshot_dir: str, out_path: str):
     lines.append("- **Active listings** = current supply visible on tracked brand sites.")
     lines.append("- **New listings** = homes visible now that were not visible in the prior snapshot.")
     lines.append("- **Removed listings** = homes visible in the prior snapshot that are no longer visible; sell-through proxy, not confirmed sales.")
-    lines.append("- **Price-cut ratio** = active listings showing a lower current price vs prior price or explicit savings/price-cut language.")
+    lines.append("- **Price-cut ratio** = active listings with a lower price than the prior snapshot or explicit price-cut/savings language.")
     lines.append("")
     lines.append("## Signal framework")
     lines.append("")
