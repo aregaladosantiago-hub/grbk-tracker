@@ -1,21 +1,21 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-04-25**
-Comparison baseline: **2026-04-24**
+Latest snapshot: **2026-04-27**
+Comparison baseline: **2026-04-25**
 
 ## Core metrics
 
 | Segment | Active | New | Removed | Price-cut ratio | Price-cut listings |
 |---|---:|---:|---:|---:|---:|
-| Total tracked | 617 | 617 | 15 | 29.7% | 183 |
-| Trophy Signature Homes | 617 | N/A | N/A | 29.7% | 183 |
+| Total tracked | 15 | 15 | 617 | 53.3% | 8 |
+| Southgate Homes | 15 | N/A | N/A | 53.3% | 8 |
 
 ## How to read it
 
 - **Active listings** = current supply visible on tracked brand sites.
 - **New listings** = homes visible now that were not visible in the prior snapshot.
 - **Removed listings** = homes visible in the prior snapshot that are no longer visible; sell-through proxy, not confirmed sales.
-- **Price-cut ratio** = active listings showing a lower current price vs prior price or explicit savings/price-cut language.
+- **Price-cut ratio** = active listings with a lower price than the prior snapshot or explicit price-cut/savings language.
 
 ## Signal framework
 
