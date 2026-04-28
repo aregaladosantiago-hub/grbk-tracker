@@ -1,14 +1,14 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-04-27**
-Comparison baseline: **2026-04-25**
+Latest snapshot: **2026-04-28**
+Comparison baseline: **2026-04-27**
 
 ## Core metrics
 
 | Segment | Active | New | Removed | Price-cut ratio | Price-cut listings |
 |---|---:|---:|---:|---:|---:|
-| Total tracked | 15 | 15 | 617 | 53.3% | 8 |
-| Southgate Homes | 15 | N/A | N/A | 53.3% | 8 |
+| Total tracked | 15 | 0 | 0 | 53.3% | 8 |
+| Southgate Homes | 15 | 0 | 0 | 53.3% | 8 |
 
 ## How to read it
 
