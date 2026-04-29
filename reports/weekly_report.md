@@ -1,7 +1,7 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-04-28**
-Comparison baseline: **2026-04-27**
+Latest snapshot: **2026-04-29**
+Comparison baseline: **2026-04-28**
 
 ## Core metrics
 
