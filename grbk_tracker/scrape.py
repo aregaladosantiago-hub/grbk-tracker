@@ -90,7 +90,13 @@ async def fetch_html(url: str, use_playwright: bool, click_load_more: bool = Fal
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page(user_agent="Mozilla/5.0 GRBK inventory research tracker")
-            await page.goto(url, wait_until="networkidle", timeout=90000)
+            # Some builder pages keep analytics/background requests open, so a hard
+            # networkidle wait can fail even after the listing HTML has loaded.
+            await page.goto(url, wait_until="domcontentloaded", timeout=90000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except PlaywrightTimeoutError:
+                pass
 
             for _ in range(5):
                 await page.mouse.wheel(0, 2500)
