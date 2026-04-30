@@ -44,7 +44,14 @@ def add_keys(df: pd.DataFrame):
     df = df.copy()
     if not df.empty:
         df["listing_key"] = clean_key(df)
+        df["brand_key"] = normalized_text(df, "brand")
     return df
+
+
+def unique_keys(df: pd.DataFrame):
+    if df.empty:
+        return set()
+    return set(add_keys(df)["listing_key"])
 
 
 def price_series(df: pd.DataFrame, column: str):
@@ -92,30 +99,110 @@ def price_cut_keys(latest: pd.DataFrame, prior: pd.DataFrame):
     return cut_keys
 
 
+def common_brand_pair(latest: pd.DataFrame, prior: pd.DataFrame):
+    latest = add_keys(latest)
+    prior = add_keys(prior)
+    if latest.empty or prior.empty:
+        return latest.iloc[0:0], prior.iloc[0:0], set()
+
+    common = set(latest["brand_key"]) & set(prior["brand_key"])
+    return (
+        latest[latest["brand_key"].isin(common)].copy(),
+        prior[prior["brand_key"].isin(common)].copy(),
+        common,
+    )
+
+
 def metric_row(label, latest, prior):
     latest = add_keys(latest)
     prior = add_keys(prior)
 
-    latest_keys = set(latest["listing_key"]) if not latest.empty else set()
-    prior_keys = set(prior["listing_key"]) if not prior.empty else set()
-
-    new_keys = latest_keys - prior_keys if prior_keys else set()
-    removed_keys = prior_keys - latest_keys if prior_keys else set()
-
-    active = len(latest_keys)
-    new = len(new_keys) if prior_keys else None
-    removed = len(removed_keys) if prior_keys else None
+    active = len(set(latest["listing_key"])) if not latest.empty else 0
     cuts = len(price_cut_keys(latest, prior))
     cut_ratio = cuts / active if active else 0
+
+    comparable_latest, comparable_prior, common = common_brand_pair(latest, prior)
+    if prior.empty or not common:
+        new = None
+        removed = None
+        new_keys = set()
+        removed_keys = set()
+    else:
+        latest_keys = set(comparable_latest["listing_key"])
+        prior_keys = set(comparable_prior["listing_key"])
+        new_keys = latest_keys - prior_keys
+        removed_keys = prior_keys - latest_keys
+        new = len(new_keys)
+        removed = len(removed_keys)
 
     return {
         "Segment": label,
         "Active": active,
-        "New": "N/A" if new is None else new,
-        "Removed": "N/A" if removed is None else removed,
+        "Daily new": "N/A" if new is None else new,
+        "Daily removed": "N/A" if removed is None else removed,
         "Price-cut ratio": f"{cut_ratio:.1%}",
         "Price-cut listings": cuts,
     }, new_keys, removed_keys
+
+
+def snapshot_for_date(df: pd.DataFrame, snapshot_date):
+    return df[df["snapshot_date"] == snapshot_date].copy()
+
+
+def flow_keys_between(previous: pd.DataFrame, current: pd.DataFrame, brand: str = None):
+    if brand is not None:
+        prev = previous[normalized_text(previous, "brand") == brand.lower()].copy()
+        curr = current[normalized_text(current, "brand") == brand.lower()].copy()
+        if prev.empty or curr.empty:
+            return None
+    else:
+        curr, prev, common = common_brand_pair(current, previous)
+        if not common:
+            return None
+
+    prev_keys = unique_keys(prev)
+    curr_keys = unique_keys(curr)
+    return curr_keys - prev_keys, prev_keys - curr_keys
+
+
+def rolling_flow_row(label, df: pd.DataFrame, dates, latest_date, brand: str = None, days: int = 7):
+    latest = snapshot_for_date(df, latest_date)
+    if brand is not None:
+        latest = latest[normalized_text(latest, "brand") == brand.lower()].copy()
+
+    active = len(unique_keys(latest))
+    start_date = pd.Timestamp(latest_date) - pd.Timedelta(days=days)
+    window_dates = [d for d in dates if start_date <= pd.Timestamp(d) <= pd.Timestamp(latest_date)]
+
+    added_keys = set()
+    removed_keys = set()
+    comparable_pairs = 0
+
+    for previous_date, current_date in zip(window_dates, window_dates[1:]):
+        previous = snapshot_for_date(df, previous_date)
+        current = snapshot_for_date(df, current_date)
+        flow = flow_keys_between(previous, current, brand=brand)
+        if flow is None:
+            continue
+        added, removed = flow
+        added_keys.update(added)
+        removed_keys.update(removed)
+        comparable_pairs += 1
+
+    if comparable_pairs == 0:
+        added = "N/A"
+        removed = "N/A"
+    else:
+        added = len(added_keys)
+        removed = len(removed_keys)
+
+    return {
+        "Segment": label,
+        "Active": active,
+        "Added last 7d": added,
+        "Removed proxy last 7d": removed,
+        "Comparable daily pairs": comparable_pairs,
+    }
 
 
 def generate_report(snapshot_dir: str, out_path: str):
@@ -128,22 +215,24 @@ def generate_report(snapshot_dir: str, out_path: str):
     dates = sorted(d for d in df["snapshot_date"].dropna().unique())
 
     latest_date = dates[-1]
-    latest = df[df["snapshot_date"] == latest_date].copy()
+    latest = snapshot_for_date(df, latest_date)
 
     prior = pd.DataFrame()
     prior_date = None
     if len(dates) >= 2:
         prior_date = dates[-2]
-        prior = df[df["snapshot_date"] == prior_date].copy()
+        prior = snapshot_for_date(df, prior_date)
 
     total_row, total_new_keys, total_removed_keys = metric_row("Total tracked", latest, prior)
 
     brand_rows = []
+    weekly_rows = [rolling_flow_row("Total tracked", df, dates, latest_date)]
     for brand in sorted(latest["brand"].dropna().unique()):
         brand_latest = latest[latest["brand"] == brand].copy()
         brand_prior = prior[prior["brand"] == brand].copy() if not prior.empty and "brand" in prior.columns else pd.DataFrame()
         row, _, _ = metric_row(brand, brand_latest, brand_prior)
         brand_rows.append(row)
+        weekly_rows.append(rolling_flow_row(brand, df, dates, latest_date, brand=brand))
 
     reports = Path("reports")
     reports.mkdir(exist_ok=True)
@@ -151,17 +240,17 @@ def generate_report(snapshot_dir: str, out_path: str):
 
     latest_with_key = add_keys(latest)
     if total_new_keys:
-        latest_with_key[latest_with_key["listing_key"].isin(total_new_keys)].drop(columns=["listing_key"]).to_csv(
-            reports / "new_vs_prior_snapshot.csv", index=False
-        )
+        latest_with_key[latest_with_key["listing_key"].isin(total_new_keys)].drop(
+            columns=["listing_key", "brand_key"]
+        ).to_csv(reports / "new_vs_prior_snapshot.csv", index=False)
     else:
         pd.DataFrame(columns=latest.columns).to_csv(reports / "new_vs_prior_snapshot.csv", index=False)
 
     prior_with_key = add_keys(prior)
     if total_removed_keys:
-        prior_with_key[prior_with_key["listing_key"].isin(total_removed_keys)].drop(columns=["listing_key"]).to_csv(
-            reports / "removed_vs_prior_snapshot.csv", index=False
-        )
+        prior_with_key[prior_with_key["listing_key"].isin(total_removed_keys)].drop(
+            columns=["listing_key", "brand_key"]
+        ).to_csv(reports / "removed_vs_prior_snapshot.csv", index=False)
     else:
         pd.DataFrame(columns=latest.columns).to_csv(reports / "removed_vs_prior_snapshot.csv", index=False)
 
@@ -171,45 +260,50 @@ def generate_report(snapshot_dir: str, out_path: str):
     lines.append("# GRBK Listing Flow Tracker")
     lines.append("")
     lines.append(f"Latest snapshot: **{pd.Timestamp(latest_date).date()}**")
-    lines.append(f"Comparison baseline: **{baseline}**")
+    lines.append(f"Daily comparison baseline: **{baseline}**")
     lines.append("")
-    lines.append("## Core metrics")
+    lines.append("## Current and daily metrics")
     lines.append("")
-    lines.append("| Segment | Active | New | Removed | Price-cut ratio | Price-cut listings |")
+    lines.append("| Segment | Active | Daily new | Daily removed | Price-cut ratio | Price-cut listings |")
     lines.append("|---|---:|---:|---:|---:|---:|")
-    all_rows = [total_row] + brand_rows
-    for row in all_rows:
+    for row in [total_row] + brand_rows:
         lines.append(
-            f"| {row['Segment']} | {row['Active']} | {row['New']} | {row['Removed']} | "
+            f"| {row['Segment']} | {row['Active']} | {row['Daily new']} | {row['Daily removed']} | "
             f"{row['Price-cut ratio']} | {row['Price-cut listings']} |"
+        )
+
+    lines.append("")
+    lines.append("## Rolling 7-day flow")
+    lines.append("")
+    lines.append("| Segment | Active | Added last 7d | Removed proxy last 7d | Comparable daily pairs |")
+    lines.append("|---|---:|---:|---:|---:|")
+    for row in weekly_rows:
+        lines.append(
+            f"| {row['Segment']} | {row['Active']} | {row['Added last 7d']} | "
+            f"{row['Removed proxy last 7d']} | {row['Comparable daily pairs']} |"
         )
 
     lines.append("")
     lines.append("## How to read it")
     lines.append("")
     lines.append("- **Active listings** = current supply visible on tracked brand sites.")
-    lines.append("- **New listings** = homes visible now that were not visible in the prior snapshot.")
-    lines.append("- **Removed listings** = homes visible in the prior snapshot that are no longer visible; sell-through proxy, not confirmed sales.")
+    lines.append("- **Daily new** = homes visible now that were not visible in the prior comparable snapshot.")
+    lines.append("- **Daily removed** = homes visible in the prior comparable snapshot that are no longer visible; sell-through proxy, not confirmed sales.")
+    lines.append("- **Added last 7d** = unique homes that appeared in any daily comparison during the rolling 7-day window.")
+    lines.append("- **Removed proxy last 7d** = unique homes that disappeared in any daily comparison during the rolling 7-day window.")
     lines.append("- **Price-cut ratio** = active listings with a lower price than the prior snapshot or explicit price-cut/savings language.")
-    lines.append("")
-    lines.append("## Signal framework")
-    lines.append("")
-    lines.append("- **Active up + removals low** = inventory building / slower sell-through.")
-    lines.append("- **Active down + removals high** = cleaner demand signal.")
-    lines.append("- **High or rising price-cut ratio** = pricing pressure / possible margin risk.")
-    lines.append("- **High removals + high price-cut ratio** = homes are moving, but likely with price support.")
     lines.append("")
     lines.append("## Notes")
     lines.append("")
-    lines.append("- This is a public-listing flow tracker, not official GRBK orders or closings.")
-    lines.append("- Removed listings are a sell-through proxy. A home can disappear because of relisting, URL changes, or temporary website changes.")
-    lines.append("- The first snapshot only establishes the baseline; the signal improves after several daily snapshots.")
+    lines.append("- New/removed counts only compare brands present in both snapshots, so adding a new tracked builder does not count its entire inventory as newly listed homes.")
+    lines.append("- Removed listings are a sell-through proxy. A home can disappear because of sale, relisting, URL changes, or temporary website changes.")
+    lines.append("- The weekly flow becomes more useful after at least seven successful daily snapshots.")
 
     Path(out_path).write_text("\n".join(lines))
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate simplified GRBK listing flow report.")
+    parser = argparse.ArgumentParser(description="Generate GRBK listing flow report.")
     parser.add_argument("--snapshot-dir", default="data/snapshots")
     parser.add_argument("--out", default="reports/weekly_report.md")
     args = parser.parse_args()
