@@ -12,7 +12,7 @@ Every daily run:
 2. Extracts candidate available-home / quick-move-in listings.
 3. Saves a dated CSV snapshot in `data/snapshots/`.
 4. Writes the latest active snapshot to `reports/latest_active.csv`.
-5. Generates `reports/weekly_report.md`.
+5. Generates `reports/weekly_report.md` and `reports/weekly_history.csv`.
 
 ## Why daily scrape + weekly analysis
 
@@ -23,9 +23,21 @@ The scraper should run daily because listings can appear, disappear, or be relis
 - `data/snapshots/YYYY-MM-DD.csv`: raw daily snapshot
 - `reports/latest_active.csv`: latest active listings captured
 - `reports/weekly_report.md`: weekly summary
-- `reports/new_vs_prior_week.csv`: listings new vs prior week snapshot
-- `reports/removed_vs_prior_week.csv`: listings removed vs prior week snapshot
-- `reports/probable_removed.csv`: listings absent long enough to qualify as probable removals
+- `reports/weekly_history.csv`: frozen seven-day history by week and brand
+- `reports/new_vs_prior_snapshot.csv`: listings new vs the prior daily snapshot
+- `reports/removed_vs_prior_snapshot.csv`: listings removed vs the prior daily snapshot
+
+## Tracked brands
+
+The tracker groups Trophy Signature Homes into one brand row across DFW, Austin, and Houston. The configured Green Brick homebuilder brands are:
+
+- Southgate Homes
+- Trophy Signature Homes
+- CB JENI Homes
+- Normandy Homes
+- Centre Living Homes
+- The Providence Group
+- GHO Homes
 
 ## Important caveat
 
@@ -47,4 +59,4 @@ The workflow in `.github/workflows/daily_scrape.yml` runs this automatically eve
 
 ## Build philosophy
 
-Start with broad generic extraction, then improve brand-specific parsers after reviewing the first few snapshots. The first goal is not perfection. The first goal is to prove whether the public websites produce clean enough data to support a useful GRBK research signal.
+Start with broad address-based extraction, then improve brand-specific parsers after reviewing the first few snapshots. The first goal is not perfection. The first goal is to protect the active/added/removed/price-cut metrics from obvious parser noise.

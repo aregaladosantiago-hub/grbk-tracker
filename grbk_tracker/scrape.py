@@ -30,7 +30,7 @@ STATUS_RE = re.compile(
     r"\b(?:Ready\s+(?:Now|January|February|March|April|May|June|July|August|September|October|November|December)|"
     r"Available Date:?\s*(?:\|\s*)?Now|"
     r"Est Completion Date:?\s*(?:\|\s*)?[A-Za-z]+\s+\d{4}|"
-    r"Available Now|Quick Move-?In|Under Construction)\b",
+    r"Move-?In Ready|Move-?In:?\s*\d{2}/\d{4}|Available Now|Quick Move-?In|Under Construction)\b",
     re.IGNORECASE,
 )
 LOT_RE = re.compile(r"((?:Block\s+[A-Z],?\s*)?Lot\s+\d+)", re.IGNORECASE)
@@ -43,18 +43,21 @@ STREET_SUFFIX_PATTERN = (
     r"Place|Pl\.?|Terrace|Trace|Pass|Crossing|Cove|Row|Path|Square|Ridge|Hollow|Landing|Glen|Springs"
 )
 STREET_RE = re.compile(
-    rf"\b(?!\d{{3,6}}\s+\d{{3,6}}\b)\d{{3,6}}\s+[A-Za-z0-9 .'-]+?\s+(?:{STREET_SUFFIX_PATTERN})\b",
+    rf"(?<![$,\d])\b(?!\d{{3,6}}\s+\d{{3,6}}\b)\d{{3,6}}\s+[A-Za-z .'-]+?\s+(?:{STREET_SUFFIX_PATTERN})\b",
+    re.IGNORECASE,
+)
+PREFIX_STREET_RE = re.compile(
+    r"(?<![$,\d])\b(?!\d{3,6}\s+\d{3,6}\b)\d{3,6}\s+(?:N|S|E|W|NE|NW|SE|SW)?\.?\s*(?:Via|Rio)\s+[A-Za-z .'-]+\b",
     re.IGNORECASE,
 )
 FULL_ADDRESS_RE = re.compile(
-    rf"\b(?!\d{{3,6}}\s+\d{{3,6}}\b)\d{{3,6}}\s+[A-Za-z0-9 .'-]+?\s+(?:{STREET_SUFFIX_PATTERN})\s+"
-    r"[A-Za-z .'-]+,?\s+(?:TX|Texas)\s+\d{5}\b",
+    rf"(?<![$,\d])\b(?!\d{{3,6}}\s+\d{{3,6}}\b)\d{{3,6}}\s+[A-Za-z .'-]+?\s+(?:{STREET_SUFFIX_PATTERN})\s+"
+    r"[A-Za-z .'-]+,?\s+(?:TX|Texas|GA|Georgia|FL|Florida)\s+\d{5}\b",
     re.IGNORECASE,
 )
 
-# Cities visible in current Southgate pages. Trophy uses FULL_ADDRESS_RE so it is not city-list bound.
 CITY_STATE_RE = re.compile(
-    r"\b(?:Aledo|Alvarado|Aubrey|Austin|Celina|Crowley|Elgin|Farmersville|Forney|Fort Worth|Greenville|Gunter|Haslet|Huffman|Hutto|Lago Vista|Lavon|McKinney|Pilot Point|Ponder|Princeton|Prosper|Seagoville|Waxahachie|Allen)\s*,?\s*(?:TX|Texas)\s+\d{5}\b",
+    r"\b[A-Za-z .'-]+,?\s+(?:TX|Texas|GA|Georgia|FL|Florida)\s+\d{5}\b",
     re.IGNORECASE,
 )
 
@@ -173,8 +176,9 @@ def extract_prices(block_lines: List[str]) -> Tuple[Optional[int], Optional[int]
         return None, None
 
     block_text = " ".join(block_lines).lower()
-    has_cut_language = any(term in block_text for term in ("new lower price", "save:", "was", "reduced"))
-    if has_cut_language and len(prices) >= 2:
+    has_cut_language = any(term in block_text for term in ("new lower price", "save", "was", "reduced"))
+    has_descending_prices = len(prices) >= 2 and prices[0] > prices[1]
+    if (has_cut_language or has_descending_prices) and len(prices) >= 2:
         current = min(prices)
         prior_candidates = [price for price in prices if price > current]
         return current, max(prior_candidates) if prior_candidates else None
@@ -199,6 +203,8 @@ def parse_float(regex, text):
 def normalize_address(address: str) -> str:
     address = re.sub(r"^\d{3,6}\s+(?=\d{3,6}\s+[A-Za-z])", "", address or "")
     address = re.sub(r"\bTexas\b", "TX", address, flags=re.IGNORECASE)
+    address = re.sub(r"\bGeorgia\b", "GA", address, flags=re.IGNORECASE)
+    address = re.sub(r"\bFlorida\b", "FL", address, flags=re.IGNORECASE)
     address = re.sub(r"\s+", " ", address)
     address = re.sub(r"\s+,", ",", address)
     return clean_text(address)
@@ -211,29 +217,59 @@ def extract_full_address(text: str) -> Optional[str]:
     return normalize_address(match.group(0))
 
 
+def extract_street_address(text: str) -> Optional[str]:
+    street = STREET_RE.search(text or "") or PREFIX_STREET_RE.search(text or "")
+    return clean_text(street.group(0)) if street else None
+
+
+def fallback_city_state(url_meta: Dict) -> Optional[str]:
+    city = clean_text(url_meta.get("city"))
+    state = clean_text(url_meta.get("state"))
+    if not city or not state:
+        return None
+
+    zip_code = clean_text(str(url_meta.get("zip", "")))
+    suffix = f"{city}, {state}"
+    if zip_code:
+        suffix = f"{suffix} {zip_code}"
+    return suffix
+
+
 def address_key(address: str) -> str:
     return clean_text(address).lower()
 
 
-def extract_address_from_lines(lines: List[str], i: int) -> Optional[str]:
+def extract_address_from_lines(lines: List[str], i: int, url_meta: Optional[Dict] = None) -> Optional[str]:
+    current_line = lines[i]
+    full_address = extract_full_address(current_line)
+    if full_address:
+        return full_address
+
+    street = extract_street_address(current_line)
+    if not street:
+        return None
+
     window = " ".join(lines[i:i + 4])
     full_address = extract_full_address(window)
     if full_address:
         return full_address
 
-    street = STREET_RE.search(window)
     city = CITY_STATE_RE.search(window)
     if street and city:
-        return normalize_address(f"{street.group(0)} {city.group(0)}")
+        return normalize_address(f"{street} {city.group(0)}")
+
+    fallback = fallback_city_state(url_meta or {})
+    if street and fallback:
+        return normalize_address(f"{street} {fallback}")
 
     return None
 
 
-def find_address_indices(lines: List[str]) -> List[Tuple[int, str]]:
+def find_address_indices(lines: List[str], url_meta: Optional[Dict] = None) -> List[Tuple[int, str]]:
     indices = []
     seen = set()
     for i in range(len(lines)):
-        address = extract_address_from_lines(lines, i)
+        address = extract_address_from_lines(lines, i, url_meta=url_meta)
         key = address_key(address or "")
         if address and key not in seen:
             seen.add(key)
@@ -484,6 +520,14 @@ def card_start_before_address(lines: List[str], address_idx: int, lower_bound: i
     return start
 
 
+def compact_card_start_before_address(lines: List[str], address_idx: int, lower_bound: int) -> int:
+    start = max(lower_bound, address_idx - 3)
+    for j in range(address_idx - 1, start - 1, -1):
+        if STATUS_RE.search(lines[j] or "") and not PRICE_RE.search(lines[j] or ""):
+            return j
+    return address_idx
+
+
 def trophy_address_points(lines: List[str]) -> List[Tuple[int, str]]:
     points = []
     seen = set()
@@ -534,6 +578,32 @@ def trophy_price_window(
     return choose_current_and_prior(real_home_price_lines(lines, address_idx, ceiling))
 
 
+def configured_section_window(lines: List[str], brand_cfg: Dict, url_meta: Dict) -> List[str]:
+    start_label = url_meta.get("section_start") or brand_cfg.get("section_start")
+    if not start_label:
+        return lines
+
+    start = None
+    needle = clean_text(start_label).lower()
+    for i, line in enumerate(lines):
+        if needle in line.lower():
+            start = i
+            break
+
+    if start is None:
+        return lines
+
+    end = len(lines)
+    end_labels = url_meta.get("section_end") or brand_cfg.get("section_end") or []
+    end_needles = [clean_text(label).lower() for label in end_labels if clean_text(label)]
+    for j in range(start + 1, len(lines)):
+        if any(needle in lines[j].lower() for needle in end_needles):
+            end = j
+            break
+
+    return lines[start:end]
+
+
 async def scrape_address_based_page(
     brand_cfg: Dict,
     url_meta: Dict,
@@ -541,6 +611,7 @@ async def scrape_address_based_page(
     use_playwright: bool,
     click_load_more: bool,
     southgate_qmi_only: bool = False,
+    wide_card_lookback: bool = False,
 ):
     source_url = url_meta["url"]
     html = await fetch_html(source_url, use_playwright=use_playwright, click_load_more=click_load_more)
@@ -548,15 +619,19 @@ async def scrape_address_based_page(
     lines = normalize_lines(html)
     if southgate_qmi_only:
         lines = qmi_window_or_all(lines)
+    lines = configured_section_window(lines, brand_cfg, url_meta)
 
-    address_points = find_address_indices(lines)
+    address_points = find_address_indices(lines, url_meta=url_meta)
     view_urls = listing_urls_from_html(html, source_url)
 
     rows = []
     for n, (idx, address) in enumerate(address_points):
         lower_bound = address_points[n - 1][0] + 1 if n > 0 else 0
         next_idx = address_points[n + 1][0] if n + 1 < len(address_points) else min(len(lines), idx + 35)
-        start = card_start_before_address(lines, idx, lower_bound)
+        if wide_card_lookback:
+            start = card_start_before_address(lines, idx, lower_bound)
+        else:
+            start = compact_card_start_before_address(lines, idx, lower_bound)
         block = lines[start:next_idx]
 
         row = parse_listing_block(
@@ -652,7 +727,15 @@ async def scrape_brand(brand_cfg: Dict, snapshot_date: str, use_playwright: bool
         if parser == "southgate_community":
             rows.extend(await scrape_address_based_page(
                 brand_cfg, url_meta, snapshot_date, use_playwright,
-                click_load_more=False, southgate_qmi_only=True
+                click_load_more=False, southgate_qmi_only=True, wide_card_lookback=True
+            ))
+        elif parser == "address_based":
+            rows.extend(await scrape_address_based_page(
+                brand_cfg,
+                url_meta,
+                snapshot_date,
+                use_playwright,
+                click_load_more=bool(url_meta.get("click_load_more", brand_cfg.get("click_load_more", False))),
             ))
         elif parser == "trophy_market":
             rows.extend(await scrape_trophy_market_page(

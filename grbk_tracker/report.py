@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -19,6 +20,31 @@ def load_snapshots(snapshot_dir: str):
     if not frames:
         return pd.DataFrame(), []
     return pd.concat(frames, ignore_index=True), paths
+
+
+def load_configured_brands(config_path: str):
+    path = Path(config_path)
+    if not path.exists():
+        return []
+
+    with open(path, "r") as f:
+        cfg = json.load(f)
+
+    brands = []
+    for brand_cfg in cfg.get("brands", []):
+        brand = brand_cfg.get("brand")
+        if brand and brand not in brands:
+            brands.append(brand)
+    return brands
+
+
+def report_brands(df: pd.DataFrame, configured_brands):
+    seen = list(configured_brands)
+    if "brand" in df.columns:
+        for brand in sorted(df["brand"].dropna().unique()):
+            if brand not in seen:
+                seen.append(brand)
+    return seen
 
 
 def normalized_text(df: pd.DataFrame, column: str):
@@ -149,6 +175,12 @@ def snapshot_for_date(df: pd.DataFrame, snapshot_date):
     return df[df["snapshot_date"] == snapshot_date].copy()
 
 
+def brand_slice(df: pd.DataFrame, brand: str):
+    if df.empty or "brand" not in df.columns:
+        return df.iloc[0:0].copy()
+    return df[normalized_text(df, "brand") == brand.lower()].copy()
+
+
 def flow_keys_between(previous: pd.DataFrame, current: pd.DataFrame, brand: str = None):
     if brand is not None:
         prev = previous[normalized_text(previous, "brand") == brand.lower()].copy()
@@ -168,7 +200,7 @@ def flow_keys_between(previous: pd.DataFrame, current: pd.DataFrame, brand: str 
 def rolling_flow_row(label, df: pd.DataFrame, dates, latest_date, brand: str = None, days: int = 7):
     latest = snapshot_for_date(df, latest_date)
     if brand is not None:
-        latest = latest[normalized_text(latest, "brand") == brand.lower()].copy()
+        latest = brand_slice(latest, brand)
 
     active = len(unique_keys(latest))
     start_date = pd.Timestamp(latest_date) - pd.Timedelta(days=days)
@@ -205,14 +237,59 @@ def rolling_flow_row(label, df: pd.DataFrame, dates, latest_date, brand: str = N
     }
 
 
-def generate_report(snapshot_dir: str, out_path: str):
+def weekly_checkpoint_dates(dates):
+    first_date = pd.Timestamp(dates[0]).normalize()
+    checkpoints = {}
+    for raw_date in dates:
+        snapshot_date = pd.Timestamp(raw_date).normalize()
+        week_number = int((snapshot_date - first_date).days // 7) + 1
+        checkpoints[week_number] = max(snapshot_date, checkpoints.get(week_number, snapshot_date))
+
+    rows = []
+    for week_number, snapshot_date in sorted(checkpoints.items()):
+        period_start = first_date + pd.Timedelta(days=(week_number - 1) * 7)
+        period_end = period_start + pd.Timedelta(days=6)
+        rows.append((week_number, period_start, period_end, snapshot_date))
+    return rows
+
+
+def data_status(active, comparable_pairs):
+    if active or comparable_pairs:
+        return "captured"
+    return "no_rows"
+
+
+def build_weekly_history(df: pd.DataFrame, dates, brands):
+    rows = []
+    for week_number, period_start, period_end, snapshot_date in weekly_checkpoint_dates(dates):
+        segment_specs = [("Total tracked", None)] + [(brand, brand) for brand in brands]
+        for label, brand in segment_specs:
+            row = rolling_flow_row(label, df, dates, snapshot_date, brand=brand)
+            rows.append({
+                "week": f"Week {week_number}",
+                "period_start": period_start.date().isoformat(),
+                "period_end": period_end.date().isoformat(),
+                "snapshot_date": snapshot_date.date().isoformat(),
+                "segment": label,
+                "active": row["Active"],
+                "added_last_7d": row["Added last 7d"],
+                "removed_proxy_last_7d": row["Removed proxy last 7d"],
+                "comparable_daily_pairs": row["Comparable daily pairs"],
+                "status": data_status(row["Active"], row["Comparable daily pairs"]),
+            })
+    return pd.DataFrame(rows)
+
+
+def generate_report(snapshot_dir: str, out_path: str, config_path: str = "config/brands.json"):
     df, paths = load_snapshots(snapshot_dir)
+    configured_brands = load_configured_brands(config_path)
     if df.empty:
         Path(out_path).write_text("# GRBK Listing Flow Tracker\n\nNo listing rows captured yet.\n")
         return
 
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"], errors="coerce")
     dates = sorted(d for d in df["snapshot_date"].dropna().unique())
+    brands = report_brands(df, configured_brands)
 
     latest_date = dates[-1]
     latest = snapshot_for_date(df, latest_date)
@@ -227,9 +304,9 @@ def generate_report(snapshot_dir: str, out_path: str):
 
     brand_rows = []
     weekly_rows = [rolling_flow_row("Total tracked", df, dates, latest_date)]
-    for brand in sorted(latest["brand"].dropna().unique()):
-        brand_latest = latest[latest["brand"] == brand].copy()
-        brand_prior = prior[prior["brand"] == brand].copy() if not prior.empty and "brand" in prior.columns else pd.DataFrame()
+    for brand in brands:
+        brand_latest = brand_slice(latest, brand)
+        brand_prior = brand_slice(prior, brand)
         row, _, _ = metric_row(brand, brand_latest, brand_prior)
         brand_rows.append(row)
         weekly_rows.append(rolling_flow_row(brand, df, dates, latest_date, brand=brand))
@@ -237,6 +314,8 @@ def generate_report(snapshot_dir: str, out_path: str):
     reports = Path("reports")
     reports.mkdir(exist_ok=True)
     latest.to_csv(reports / "latest_active.csv", index=False)
+    weekly_history = build_weekly_history(df, dates, brands)
+    weekly_history.to_csv(reports / "weekly_history.csv", index=False)
 
     latest_with_key = add_keys(latest)
     if total_new_keys:
@@ -284,6 +363,19 @@ def generate_report(snapshot_dir: str, out_path: str):
         )
 
     lines.append("")
+    lines.append("## Weekly history log")
+    lines.append("")
+    lines.append("| Week | Period | Segment | Active | Added last 7d | Removed proxy last 7d | Comparable daily pairs | Status |")
+    lines.append("|---|---|---|---:|---:|---:|---:|---|")
+    for row in weekly_history.to_dict("records"):
+        period = f"{row['period_start']} to {row['period_end']}"
+        lines.append(
+            f"| {row['week']} | {period} | {row['segment']} | {row['active']} | "
+            f"{row['added_last_7d']} | {row['removed_proxy_last_7d']} | "
+            f"{row['comparable_daily_pairs']} | {row['status']} |"
+        )
+
+    lines.append("")
     lines.append("## How to read it")
     lines.append("")
     lines.append("- **Active listings** = current supply visible on tracked brand sites.")
@@ -291,11 +383,13 @@ def generate_report(snapshot_dir: str, out_path: str):
     lines.append("- **Daily removed** = homes visible in the prior comparable snapshot that are no longer visible; sell-through proxy, not confirmed sales.")
     lines.append("- **Added last 7d** = unique homes that appeared in any daily comparison during the rolling 7-day window.")
     lines.append("- **Removed proxy last 7d** = unique homes that disappeared in any daily comparison during the rolling 7-day window.")
+    lines.append("- **Weekly history log** = frozen seven-day periods from the first saved snapshot, so Week 1 and Week 2 remain auditable instead of being overwritten by the latest rolling view.")
     lines.append("- **Price-cut ratio** = active listings with a lower price than the prior snapshot or explicit price-cut/savings language.")
     lines.append("")
     lines.append("## Notes")
     lines.append("")
     lines.append("- New/removed counts only compare brands present in both snapshots, so adding a new tracked builder does not count its entire inventory as newly listed homes.")
+    lines.append("- Newly configured brands show `no_rows` until their first successful snapshot is captured.")
     lines.append("- Removed listings are a sell-through proxy. A home can disappear because of sale, relisting, URL changes, or temporary website changes.")
     lines.append("- The weekly flow becomes more useful after at least seven successful daily snapshots.")
 
@@ -306,5 +400,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate GRBK listing flow report.")
     parser.add_argument("--snapshot-dir", default="data/snapshots")
     parser.add_argument("--out", default="reports/weekly_report.md")
+    parser.add_argument("--config", default="config/brands.json")
     args = parser.parse_args()
-    generate_report(args.snapshot_dir, args.out)
+    generate_report(args.snapshot_dir, args.out, args.config)
