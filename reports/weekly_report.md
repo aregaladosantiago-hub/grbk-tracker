@@ -1,23 +1,23 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-05-07**
-Daily comparison baseline: **2026-05-06**
+Latest snapshot: **2026-05-09**
+Daily comparison baseline: **2026-05-07**
 
 ## Current and daily metrics
 
 | Segment | Active | Daily new | Daily removed | Price-cut ratio | Price-cut listings |
 |---|---:|---:|---:|---:|---:|
-| Total tracked | 347 | 13 | 9 | 38.9% | 135 |
+| Total tracked | 362 | 25 | 10 | 37.6% | 136 |
 | Southgate Homes | 14 | 0 | 0 | 50.0% | 7 |
-| Trophy Signature Homes | 333 | 13 | 9 | 38.4% | 128 |
+| Trophy Signature Homes | 348 | 25 | 10 | 37.1% | 129 |
 
 ## Rolling 7-day flow
 
 | Segment | Active | Added last 7d | Removed proxy last 7d | Comparable daily pairs |
 |---|---:|---:|---:|---:|
-| Total tracked | 347 | 38 | 54 | 7 |
-| Southgate Homes | 14 | 1 | 2 | 7 |
-| Trophy Signature Homes | 333 | 37 | 52 | 7 |
+| Total tracked | 362 | 57 | 38 | 6 |
+| Southgate Homes | 14 | 1 | 1 | 6 |
+| Trophy Signature Homes | 348 | 56 | 37 | 6 |
 
 ## How to read it
 
