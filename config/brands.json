@@ -82,10 +82,11 @@
     {
       "brand": "CB JENI Homes",
       "market": "DFW",
-      "parser": "address_based",
+      "parser": "cbjeni_api",
       "urls": [
         {
-          "url": "https://cbjenihomes.com/find-your-home/new-now/",
+          "url": "https://cbjenihomes.com/find-your-home/?price=any&bedrooms=any&bathrooms=any&stories=any&city=any&school=any&floorplan=any&payment=any&size=any&quick=true",
+          "api_url": "https://cbjenihomes.com/wp-admin/admin-ajax.php",
           "market": "DFW"
         }
       ]
