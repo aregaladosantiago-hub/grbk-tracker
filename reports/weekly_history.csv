@@ -1,25 +1,25 @@
-week,period_start,period_end,snapshot_date,segment,active,added_last_7d,removed_proxy_last_7d,comparable_daily_pairs,status
-Week 1,2026-04-24,2026-04-30,2026-04-30,Total tracked,363,0,0,3,captured
-Week 1,2026-04-24,2026-04-30,2026-04-30,Southgate Homes,15,0,0,3,captured
-Week 1,2026-04-24,2026-04-30,2026-04-30,Trophy Signature Homes,348,N/A,N/A,0,captured
-Week 1,2026-04-24,2026-04-30,2026-04-30,CB JENI Homes,0,N/A,N/A,0,no_rows
-Week 1,2026-04-24,2026-04-30,2026-04-30,Normandy Homes,0,N/A,N/A,0,no_rows
-Week 1,2026-04-24,2026-04-30,2026-04-30,Centre Living Homes,0,N/A,N/A,0,no_rows
-Week 1,2026-04-24,2026-04-30,2026-04-30,The Providence Group,0,N/A,N/A,0,no_rows
-Week 1,2026-04-24,2026-04-30,2026-04-30,GHO Homes,0,N/A,N/A,0,no_rows
-Week 2,2026-05-01,2026-05-07,2026-05-07,Total tracked,347,38,54,7,captured
-Week 2,2026-05-01,2026-05-07,2026-05-07,Southgate Homes,14,1,2,7,captured
-Week 2,2026-05-01,2026-05-07,2026-05-07,Trophy Signature Homes,333,37,52,7,captured
-Week 2,2026-05-01,2026-05-07,2026-05-07,CB JENI Homes,0,N/A,N/A,0,no_rows
-Week 2,2026-05-01,2026-05-07,2026-05-07,Normandy Homes,0,N/A,N/A,0,no_rows
-Week 2,2026-05-01,2026-05-07,2026-05-07,Centre Living Homes,0,N/A,N/A,0,no_rows
-Week 2,2026-05-01,2026-05-07,2026-05-07,The Providence Group,0,N/A,N/A,0,no_rows
-Week 2,2026-05-01,2026-05-07,2026-05-07,GHO Homes,0,N/A,N/A,0,no_rows
-Week 3,2026-05-08,2026-05-14,2026-05-12,Total tracked,661,57,47,4,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,Southgate Homes,14,1,1,4,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,Trophy Signature Homes,340,53,43,4,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,CB JENI Homes,47,N/A,N/A,0,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,Normandy Homes,65,1,1,1,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,Centre Living Homes,27,0,0,1,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,The Providence Group,131,2,2,1,captured
-Week 3,2026-05-08,2026-05-14,2026-05-12,GHO Homes,37,0,0,1,captured
+week,period_start,period_end,snapshot_date,segment,active,added_this_week,removed_sold_proxy,net_change,status
+Week 1,2026-04-24,2026-04-30,2026-04-30,Total tracked,363,0,0,0,captured
+Week 1,2026-04-24,2026-04-30,2026-04-30,Southgate Homes,15,0,0,0,captured
+Week 1,2026-04-24,2026-04-30,2026-04-30,Trophy Signature Homes,348,N/A,N/A,N/A,captured
+Week 1,2026-04-24,2026-04-30,2026-04-30,CB JENI Homes,0,N/A,N/A,N/A,no_rows
+Week 1,2026-04-24,2026-04-30,2026-04-30,Normandy Homes,0,N/A,N/A,N/A,no_rows
+Week 1,2026-04-24,2026-04-30,2026-04-30,Centre Living Homes,0,N/A,N/A,N/A,no_rows
+Week 1,2026-04-24,2026-04-30,2026-04-30,The Providence Group,0,N/A,N/A,N/A,no_rows
+Week 1,2026-04-24,2026-04-30,2026-04-30,GHO Homes,0,N/A,N/A,N/A,no_rows
+Week 2,2026-05-01,2026-05-07,2026-05-07,Total tracked,347,38,54,-16,captured
+Week 2,2026-05-01,2026-05-07,2026-05-07,Southgate Homes,14,1,2,-1,captured
+Week 2,2026-05-01,2026-05-07,2026-05-07,Trophy Signature Homes,333,37,52,-15,captured
+Week 2,2026-05-01,2026-05-07,2026-05-07,CB JENI Homes,0,N/A,N/A,N/A,no_rows
+Week 2,2026-05-01,2026-05-07,2026-05-07,Normandy Homes,0,N/A,N/A,N/A,no_rows
+Week 2,2026-05-01,2026-05-07,2026-05-07,Centre Living Homes,0,N/A,N/A,N/A,no_rows
+Week 2,2026-05-01,2026-05-07,2026-05-07,The Providence Group,0,N/A,N/A,N/A,no_rows
+Week 2,2026-05-01,2026-05-07,2026-05-07,GHO Homes,0,N/A,N/A,N/A,no_rows
+Week 3,2026-05-08,2026-05-14,2026-05-12,Total tracked,661,30,23,+7,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,Southgate Homes,14,0,0,0,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,Trophy Signature Homes,340,27,20,+7,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,CB JENI Homes,47,N/A,N/A,N/A,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,Normandy Homes,65,1,1,0,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,Centre Living Homes,27,0,0,0,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,The Providence Group,131,2,2,0,captured
+Week 3,2026-05-08,2026-05-14,2026-05-12,GHO Homes,37,0,0,0,captured
