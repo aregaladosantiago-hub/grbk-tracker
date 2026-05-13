@@ -2,24 +2,19 @@
 
 ## Core weekly metrics
 
-- Active listings by brand/community
-- New listings vs prior week
-- Removed listings vs prior week
-- Probable removals after 7+ days absent
-- High-confidence removals after 14+ days absent
-- Price cuts as % of active listings
-- Median price cut amount
-- Listings with incentive language
-- Median days seen for active listings
-- Ready-now / quick-move-in inventory when status extraction is clean enough
+- Active listings by brand
+- Added listings over the last seven days
+- Removed listings over the last seven days
+- Price-cut listings and price-cut ratio
+- Comparable daily pairs supporting the seven-day flow
 
 ## Positive signal
 
-Inventory flat/down, removals rising, price cuts limited, incentive language stable/down, ready-now inventory not aging.
+Inventory flat/down, removals rising, and price cuts limited.
 
 ## Negative signal
 
-Inventory building, removals slowing, price cuts broadening, incentives increasing, completed inventory aging.
+Inventory building, removals slowing, and price cuts broadening.
 
 ## Best thesis use
 

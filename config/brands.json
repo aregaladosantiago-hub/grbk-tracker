@@ -78,6 +78,144 @@
           "market": "Houston"
         }
       ]
+    },
+    {
+      "brand": "CB JENI Homes",
+      "market": "DFW",
+      "parser": "cbjeni_api",
+      "urls": [
+        {
+          "url": "https://cbjenihomes.com/find-your-home/?price=any&bedrooms=any&bathrooms=any&stories=any&city=any&school=any&floorplan=any&payment=any&size=any&quick=true",
+          "api_url": "https://cbjenihomes.com/wp-admin/admin-ajax.php",
+          "market": "DFW"
+        }
+      ]
+    },
+    {
+      "brand": "Normandy Homes",
+      "market": "DFW",
+      "parser": "address_based",
+      "urls": [
+        {
+          "url": "https://normandyhomes.com/find-your-home/?bathrooms=any&bedrooms=any&city=any&payment=any&price=any&quick=true&size=any&stories=any",
+          "market": "DFW"
+        }
+      ]
+    },
+    {
+      "brand": "Centre Living Homes",
+      "market": "DFW",
+      "parser": "address_based",
+      "urls": [
+        {
+          "url": "https://centrelivinghomes.com/new-homes/available/",
+          "market": "DFW"
+        }
+      ]
+    },
+    {
+      "brand": "The Providence Group",
+      "market": "Atlanta",
+      "parser": "address_based",
+      "urls": [
+        {
+          "url": "https://theprovidencegroup.com/new-homes/available/",
+          "market": "Atlanta"
+        }
+      ]
+    },
+    {
+      "brand": "GHO Homes",
+      "market": "Florida Treasure Coast",
+      "parser": "address_based",
+      "section_start": "Available Inventory",
+      "section_end": ["Floor Plan", "Site Plan", "Photo Gallery", "Contact Us"],
+      "urls": [
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/the-island-vero-beach/central-beach",
+          "community": "Central Beach",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/the-island-vero-beach/seaglass",
+          "community": "Seaglass",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/the-island-vero-beach/the-strand",
+          "community": "The Strand",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/vero-beach/bent-pine-preserve",
+          "community": "Bent Pine Preserve",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/vero-beach/high-pointe",
+          "community": "High Pointe",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/vero-beach/lucaya-pointe",
+          "community": "Lucaya Pointe",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/vero-beach/ravens-landing",
+          "community": "Raven's Landing",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/vero-beach/the-falls-at-grand-harbor",
+          "community": "The Falls at Grand Harbor",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/indian-river-county/vero-beach/the-reserve-at-grand-harbor",
+          "community": "The Reserve at Grand Harbor",
+          "city": "Vero Beach",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/st-lucie-county/port-st-lucie/tesoro-club",
+          "community": "Tesoro Club",
+          "city": "Port St. Lucie",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/st-lucie-county/tradition/belterra",
+          "community": "BELTERRA",
+          "city": "Port St. Lucie",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        },
+        {
+          "url": "https://www.ghohomes.com/new-homes/florida/st-lucie-county/tradition/lake-park-at-tradition",
+          "community": "Lake Park at Tradition",
+          "city": "Port St. Lucie",
+          "state": "FL",
+          "market": "Florida Treasure Coast"
+        }
+      ]
     }
   ]
 }
