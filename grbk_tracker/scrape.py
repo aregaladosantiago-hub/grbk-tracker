@@ -1,7 +1,12 @@
+import argparse
 import asyncio
+import json
 import time
-from typing import Dict, Optional
+from datetime import date
+from pathlib import Path
+from typing import Dict, List, Optional
 
+import pandas as pd
 import requests
 
 from . import scrape_base as base
@@ -9,6 +14,9 @@ from .scrape_base import *  # noqa: F401,F403 - keep the original scraper API av
 
 
 BASE_SCRAPE_BRAND = base.scrape_brand
+FETCH_ATTEMPTS = 3
+FETCH_RETRY_SECONDS = 5
+REQUEST_TIMEOUT_SECONDS = (10, 75)
 
 
 def clean_optional(value) -> Optional[str]:
@@ -25,6 +33,68 @@ def coerce_int(value) -> Optional[int]:
         return int(float(str(value).replace(",", "")))
     except (TypeError, ValueError):
         return None
+
+
+def combined_qa_flag(existing, flag: str) -> Optional[str]:
+    parts = []
+    if existing is not None and not pd.isna(existing):
+        parts = [part for part in str(existing).split(";") if part and part.lower() != "nan"]
+    if flag not in parts:
+        parts.append(flag)
+    return ";".join(parts) if parts else None
+
+
+def request_with_retries(method: str, url: str, *, attempts: int = FETCH_ATTEMPTS, **kwargs):
+    last_exc = None
+    for attempt in range(1, attempts + 1):
+        try:
+            response = requests.request(method, url, timeout=REQUEST_TIMEOUT_SECONDS, **kwargs)
+            if response.status_code in {408, 429} or response.status_code >= 500:
+                response.raise_for_status()
+            return response
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt == attempts:
+                raise
+            print(f"WARNING request attempt {attempt}/{attempts} failed for {url}: {exc}")
+            time.sleep(min(FETCH_RETRY_SECONDS * attempt, 20))
+
+    raise last_exc
+
+
+def previous_snapshot_path(snapshot_date: str, out_dir: str) -> Optional[Path]:
+    current = str(snapshot_date)
+    candidates = [path for path in sorted(Path(out_dir).glob("*.csv")) if path.stem < current]
+    return candidates[-1] if candidates else None
+
+
+def carried_forward_rows_for_brand(brand: str, snapshot_date: str, out_dir: str) -> List[Dict]:
+    previous = previous_snapshot_path(snapshot_date, out_dir)
+    if previous is None:
+        return []
+
+    try:
+        df = pd.read_csv(previous)
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        return []
+
+    if df.empty or "brand" not in df.columns:
+        return []
+
+    rows = df[df["brand"].fillna("").astype(str) == brand].copy()
+    if rows.empty:
+        return []
+
+    rows["snapshot_date"] = snapshot_date
+    qa_series = rows.get("qa_flag", pd.Series([None] * len(rows), index=rows.index))
+    rows["qa_flag"] = qa_series.apply(
+        lambda value: combined_qa_flag(
+            combined_qa_flag(value, "carried_forward_after_scrape_error"),
+            f"carried_forward_from_{previous.stem}",
+        )
+    )
+    rows = rows.reindex(columns=base.SNAPSHOT_COLUMNS)
+    return rows.to_dict("records")
 
 
 def coerce_float(value) -> Optional[float]:
@@ -146,10 +216,11 @@ def parse_cbjeni_home(home: Dict, brand_cfg: Dict, url_meta: Dict, source_url: s
 async def scrape_cbjeni_api_page(brand_cfg: Dict, url_meta: Dict, snapshot_date: str):
     source_url = url_meta["url"]
     api_url = url_meta.get("api_url") or source_url
-    response = requests.post(
+    response = request_with_retries(
+        "post",
         api_url,
         data={"action": "new_and_now"},
-        timeout=45,
+        attempts=4,
         headers={
             "User-Agent": "Mozilla/5.0 GRBK inventory research tracker",
             "Referer": source_url,
@@ -190,8 +261,58 @@ async def scrape_brand(brand_cfg: Dict, snapshot_date: str, use_playwright: bool
 
 
 async def main():
-    base.scrape_brand = scrape_brand
-    await base.main()
+    parser = argparse.ArgumentParser(description="Scrape GRBK listing flow snapshots.")
+    parser.add_argument("--config", default="config/brands.json")
+    parser.add_argument("--out-dir", default="data/snapshots")
+    parser.add_argument("--date", default=str(date.today()))
+    args = parser.parse_args()
+
+    with open(args.config, "r") as f:
+        cfg = json.load(f)
+
+    settings = cfg.get("settings", {})
+    use_playwright = bool(settings.get("use_playwright", True))
+    delay = float(settings.get("request_delay_seconds", 1))
+    carry_forward_on_error = bool(settings.get("carry_forward_on_scrape_error", True))
+
+    all_rows = []
+    fatal_errors = []
+    carried_forward_errors = []
+    for brand_cfg in cfg["brands"]:
+        brand = brand_cfg.get("brand", "UNKNOWN")
+        try:
+            rows = await scrape_brand(brand_cfg, args.date, use_playwright, delay)
+            if not rows and carry_forward_on_error:
+                fallback_rows = carried_forward_rows_for_brand(brand, args.date, args.out_dir)
+                if fallback_rows:
+                    print(f"WARNING {brand}: captured 0 rows; carrying forward {len(fallback_rows)} rows from prior snapshot.")
+                    all_rows.extend(fallback_rows)
+                    carried_forward_errors.append(f"WARNING scraping {brand}: captured 0 rows")
+                    continue
+
+            print(f"{brand}: {len(rows)} usable listing rows")
+            all_rows.extend(rows)
+        except Exception as exc:
+            error = f"ERROR scraping {brand}: {exc}"
+            print(error)
+            fallback_rows = carried_forward_rows_for_brand(brand, args.date, args.out_dir) if carry_forward_on_error else []
+            if fallback_rows:
+                print(f"WARNING {brand}: carrying forward {len(fallback_rows)} rows from prior snapshot after scrape error.")
+                all_rows.extend(fallback_rows)
+                carried_forward_errors.append(error)
+            else:
+                fatal_errors.append(error)
+
+    if fatal_errors:
+        raise SystemExit("\n".join(fatal_errors))
+
+    if carried_forward_errors:
+        print("WARNING scrape completed with carried-forward brand data:")
+        for error in carried_forward_errors:
+            print(error)
+
+    out_path = base.write_snapshot(all_rows, args.date, args.out_dir)
+    print(f"Saved {len(all_rows)} rows to {out_path}")
 
 
 if __name__ == "__main__":
