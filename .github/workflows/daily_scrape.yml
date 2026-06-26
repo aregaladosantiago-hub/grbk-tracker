@@ -4,10 +4,23 @@ on:
   schedule:
     - cron: "30 12 * * *"
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/daily_scrape.yml"
+      - "config/**"
+      - "grbk_tracker/**"
+      - "requirements.txt"
+
+concurrency:
+  group: grbk-daily-scrape-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
 
