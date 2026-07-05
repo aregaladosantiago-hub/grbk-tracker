@@ -1,7 +1,7 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-07-04**
-Daily comparison baseline: **2026-07-03**
+Latest snapshot: **2026-07-05**
+Daily comparison baseline: **2026-07-04**
 Current week: **Week 11 (2026-07-03 to 2026-07-09)**
 
 ## Current snapshot movement
@@ -36,6 +36,7 @@ Current week: **Week 11 (2026-07-03 to 2026-07-09)**
 |---|---:|---:|---:|
 | 2026-07-03 | 2 | 13 | -11 |
 | 2026-07-04 | 0 | 0 | 0 |
+| 2026-07-05 | 0 | 0 | 0 |
 
 ## Weekly history log
 
