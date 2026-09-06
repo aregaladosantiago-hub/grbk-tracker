@@ -1,21 +1,21 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-09-05**
-Daily comparison baseline: **2026-09-04**
+Latest snapshot: **2026-09-06**
+Daily comparison baseline: **2026-09-05**
 Current week: **Week 20 (2026-09-04 to 2026-09-10)**
 
 ## Current snapshot movement
 
 | Segment | Active | New since prior | Removed / Sold Proxy | Net Change |
 |---|---:|---:|---:|---:|
-| Total tracked | 733 | 2 | 3 | -1 |
+| Total tracked | 733 | 0 | 0 | 0 |
 | Southgate Homes | 28 | 0 | 0 | 0 |
-| Trophy Signature Homes | 403 | 0 | 1 | -1 |
-| CB JENI Homes | 30 | 0 | 1 | -1 |
-| Normandy Homes | 62 | 2 | 0 | +2 |
+| Trophy Signature Homes | 403 | 0 | 0 | 0 |
+| CB JENI Homes | 30 | 0 | 0 | 0 |
+| Normandy Homes | 62 | 0 | 0 | 0 |
 | Centre Living Homes | 43 | 0 | 0 | 0 |
 | The Providence Group | 127 | 0 | 0 | 0 |
-| GHO Homes | 40 | 0 | 1 | -1 |
+| GHO Homes | 40 | 0 | 0 | 0 |
 
 ## Weekly sales traction
 
@@ -36,6 +36,7 @@ Current week: **Week 20 (2026-09-04 to 2026-09-10)**
 |---|---:|---:|---:|
 | 2026-09-04 | 22 | 21 | +1 |
 | 2026-09-05 | 2 | 3 | -1 |
+| 2026-09-06 | 0 | 0 | 0 |
 
 ## Weekly history log
 
