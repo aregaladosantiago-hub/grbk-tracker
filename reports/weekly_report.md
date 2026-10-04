@@ -1,33 +1,33 @@
 # GRBK Listing Flow Tracker
 
-Latest snapshot: **2026-10-03**
-Daily comparison baseline: **2026-10-02**
+Latest snapshot: **2026-10-04**
+Daily comparison baseline: **2026-10-03**
 Current week: **Week 24 (2026-10-02 to 2026-10-08)**
 
 ## Current snapshot movement
 
 | Segment | Active | New since prior | Removed / Sold Proxy | Net Change |
 |---|---:|---:|---:|---:|
-| Total tracked | 723 | 4 | 16 | -12 |
+| Total tracked | 727 | 5 | 1 | +4 |
 | Southgate Homes | 26 | 0 | 0 | 0 |
-| Trophy Signature Homes | 392 | 3 | 14 | -11 |
+| Trophy Signature Homes | 392 | 0 | 0 | 0 |
 | CB JENI Homes | 41 | 0 | 0 | 0 |
-| Normandy Homes | 71 | 1 | 0 | +1 |
-| Centre Living Homes | 39 | 0 | 2 | -2 |
-| The Providence Group | 121 | 0 | 0 | 0 |
+| Normandy Homes | 71 | 0 | 0 | 0 |
+| Centre Living Homes | 39 | 0 | 0 | 0 |
+| The Providence Group | 125 | 5 | 1 | +4 |
 | GHO Homes | 33 | 0 | 0 | 0 |
 
 ## Weekly sales traction
 
 | Segment | Active | Added this week | Removed / Sold Proxy | Net Change |
 |---|---:|---:|---:|---:|
-| Total tracked | 723 | 7 | 21 | -14 |
+| Total tracked | 727 | 12 | 22 | -10 |
 | Southgate Homes | 26 | 1 | 1 | 0 |
 | Trophy Signature Homes | 392 | 3 | 16 | -13 |
 | CB JENI Homes | 41 | 2 | 1 | +1 |
 | Normandy Homes | 71 | 1 | 0 | +1 |
 | Centre Living Homes | 39 | 0 | 2 | -2 |
-| The Providence Group | 121 | 0 | 0 | 0 |
+| The Providence Group | 125 | 5 | 1 | +4 |
 | GHO Homes | 33 | 0 | 1 | -1 |
 
 ## Daily movement this week
@@ -36,6 +36,7 @@ Current week: **Week 24 (2026-10-02 to 2026-10-08)**
 |---|---:|---:|---:|
 | 2026-10-02 | 3 | 5 | -2 |
 | 2026-10-03 | 4 | 16 | -12 |
+| 2026-10-04 | 5 | 1 | +4 |
 
 ## Weekly history log
 
@@ -225,13 +226,13 @@ Current week: **Week 24 (2026-10-02 to 2026-10-08)**
 | Week 23 | 2026-09-25 to 2026-10-01 | Centre Living Homes | 41 | 7 | 2 | +5 | captured |
 | Week 23 | 2026-09-25 to 2026-10-01 | The Providence Group | 121 | 10 | 17 | -7 | captured |
 | Week 23 | 2026-09-25 to 2026-10-01 | GHO Homes | 34 | 2 | 2 | 0 | captured |
-| Week 24 | 2026-10-02 to 2026-10-08 | Total tracked | 723 | 7 | 21 | -14 | captured |
+| Week 24 | 2026-10-02 to 2026-10-08 | Total tracked | 727 | 12 | 22 | -10 | captured |
 | Week 24 | 2026-10-02 to 2026-10-08 | Southgate Homes | 26 | 1 | 1 | 0 | captured |
 | Week 24 | 2026-10-02 to 2026-10-08 | Trophy Signature Homes | 392 | 3 | 16 | -13 | captured |
 | Week 24 | 2026-10-02 to 2026-10-08 | CB JENI Homes | 41 | 2 | 1 | +1 | captured |
 | Week 24 | 2026-10-02 to 2026-10-08 | Normandy Homes | 71 | 1 | 0 | +1 | captured |
 | Week 24 | 2026-10-02 to 2026-10-08 | Centre Living Homes | 39 | 0 | 2 | -2 | captured |
-| Week 24 | 2026-10-02 to 2026-10-08 | The Providence Group | 121 | 0 | 0 | 0 | captured |
+| Week 24 | 2026-10-02 to 2026-10-08 | The Providence Group | 125 | 5 | 1 | +4 | captured |
 | Week 24 | 2026-10-02 to 2026-10-08 | GHO Homes | 33 | 0 | 1 | -1 | captured |
 
 ## How to read it
